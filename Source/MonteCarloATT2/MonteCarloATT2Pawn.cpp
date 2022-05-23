@@ -9,7 +9,7 @@
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
-#define _USE_MATH_DEFINES 
+
 #include "Math.h"
 #include <algorithm>
 #include <future>
@@ -19,13 +19,18 @@
 #include <stdio.h>
 #include "Spin_Num.h"
 
+#define _USE_MATH_DEFINES 
+#define triangle
+
 using namespace std;
 
 //FAsyncTask<FMyAsyncTask> MyTask;
 spin S[MaxNumber][MaxNumber];
+//vector<vector<spin>> S;
 
+int MaxX = 10, MaxY = 10;
 
-double J = -0.5;
+double J = -0.5, Jrow = -0.5;
 float h = -1, Ansotropy = -1.75; // to Edit
 double hstart = 0, hend= -1.75, hdelta = 0.1;
 int Raws = 10,  RawsPerL = 1;
@@ -140,7 +145,6 @@ void AMonteCarloATT2Pawn::Tick(float DeltaSeconds)
 
 				}
 
-		//		TextOut(result, 0);
 				CurrenRaw = 1;
 				EraseAllSpins();
 				h = h + hdelta;
@@ -163,12 +167,11 @@ void AMonteCarloATT2Pawn::Tick(float DeltaSeconds)
 double AMonteCarloATT2Pawn::GetMagnetization()
 {
 	double M = 0;
-	for (int i = 0; i < MaxNumber; i++)
+	for (int i = 0; i < MaxX; i++)
 	{
-		for (int j = 0; j < MaxNumber; j++)
+		for (int j = 0; j < MaxY; j++)
 		{
 			M += S[i][j].Sz;
-
 		}
 
 
@@ -190,7 +193,7 @@ void FMyAsyncTask::DoWork()
 
 
 UFUNCTION(BlueprintCallable)
-void AMonteCarloATT2Pawn::SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, int Raws_, int RawsPerL_)
+void AMonteCarloATT2Pawn::SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, float Jrow_, int Raws_, int RawsPerL_, int MaxX_, int MaxY_)
 {
 	
 //	double h = 1, Ansotropy = -1.75; // to Edit
@@ -200,12 +203,18 @@ void AMonteCarloATT2Pawn::SetParameters(float hstart_, float hend_, float hdelta
 	Ansotropy = Anis_;
 	T = T_;
 	J = J_;
-
+	Jrow = Jrow_;
 	Raws = Raws_,	
 	RawsPerL = RawsPerL_;
 
+	MaxX = MaxX_;
+	MaxY = MaxY_;
+
 	h = hstart;
 
+	bool retflag;
+	SetStartingSpinRotations(retflag);
+	if (retflag) return;
 	UE_LOG(LogTemp, Warning, TEXT("Set Parameters"));
 }
 
@@ -291,9 +300,7 @@ void AMonteCarloATT2Pawn::BeginPlay()
 
 	}
 
-	bool retflag;
-	SetStartingSpinRotations(retflag);
-	if (retflag) return;
+	
 
 	LastTime = FPlatformTime::Seconds();
 
@@ -313,22 +320,120 @@ void AMonteCarloATT2Pawn::SetStartingSpinRotations(bool& retflag)
 		return;
 	}
 
-	for (int i = 0; i< MaxNumber; i++)
+	for (int i = 0; i< MaxX; i++)
 	{
-		for (int j = 0; j < MaxNumber; j++)
+		for (int j = 0; j < MaxY; j++)
 		{
 			Fi = (float)(std::rand() % 360);
 			cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
 
-			Teta = 180/M_PI*acos(cosTeta); //radians to grad
+			Teta = 180 / M_PI * acos(cosTeta); //radians to grad
 
 			Rotation = SetSpinRotation(Teta, Fi);
-
+#ifdef square
 			Location = FVector(StartX + i * Distance_between, StartY + j * Distance_between, StartZ);
 			GetWorld()->SpawnActor<AActor>(SpinsBP, Location, Rotation);
+#endif square
+
+#ifdef triangle
+
+			enum SpinPosition
+			{
+
+				FirstTriangleLeft,
+				FirstTriangleRight,
+				FirstTriangleUp,
+				SecondTriangleLeft,
+				SecondTriangleRight,
+				SecondTriangleDown,
+			};
+			SpinPosition Position;
+		//	int X = (i + 1), Y = j + 1;
+
+		//	float Test = 10000;
+			if ((j % 2) == 1)
+			{
+				switch (i % 6)
+				{
+				case 0:
+				{
+					Position = FirstTriangleLeft;
+					Location = FVector(StartX + 0, StartY + 0, StartZ);
+				}break;
+				case 1:
+				{
+					Position = FirstTriangleRight;
+					Location = FVector(StartX + Distance_between, StartY + 0, StartZ);
+				}break;
+				case 2:
+				{
+					Position = FirstTriangleUp;
+					Location = FVector(StartX + Distance_between / 2, StartY + Distance_between * sqrt(2) / 2, StartZ);
+				}break;
+				case 3:
+				{
+					Position = SecondTriangleLeft;
+					Location = FVector(StartX + 2 * Distance_between, StartY + 0, StartZ);
+				}break;
+				case 4:
+				{
+					Position = SecondTriangleRight;
+					Location = FVector(StartX + 3 * Distance_between, StartY + 0, StartZ);
+				}break;
+				case 5:
+				{
+					Position = SecondTriangleDown;
+					Location = FVector(StartX + 2 * Distance_between + Distance_between / 2, StartY - Distance_between * sqrt(2) / 2, StartZ);
+				}break;
+				}
+			}
+			if ((j % 2) == 0)
+			{
+				switch (i % 6)
+				{
+				case 0:
+				{
+					Position = SecondTriangleLeft;
+					Location = FVector(StartX + 0, StartY+ 3 * Distance_between + 0, StartZ );
+				}break;
+				case 1:
+				{
+					Position = SecondTriangleRight;
+					Location = FVector(StartX + Distance_between , StartY + 0+ 3 * Distance_between, StartZ);
+				}break;
+				case 2:
+				{
+					Position = SecondTriangleDown;
+					Location = FVector(StartX + Distance_between / 2, StartY+ 3 * Distance_between - Distance_between * sqrt(2) / 2, StartZ );
+
+				}break;
+				case 3:
+				{
+					Position = FirstTriangleLeft;
+					Location = FVector(StartX + 2 * Distance_between, StartY + 3 * Distance_between + 0, StartZ);
+				}break;
+				case 4:
+				{
+					Position = FirstTriangleRight;
+					Location = FVector(StartX + 3 * Distance_between, StartY + 3 * Distance_between + 0, StartZ);
+				}break;
+				case 5:
+				{
+					Position = FirstTriangleUp;
+					Location = FVector(StartX + 2 * Distance_between + Distance_between / 2, StartY  + 3 * Distance_between+ Distance_between * sqrt(2) / 2, StartZ);
+
+				}break;
+				}
+			}
+			FVector SiteLocation = FVector((i / 6) * 4 * Distance_between, (j / 2) * 6 * Distance_between, 0);
+
+			Location += SiteLocation;
+
+			//		Location = FVector(StartX + i * Distance_between, StartY + j * Distance_between*3 , StartZ);
+			GetWorld()->SpawnActor<AActor>(SpinsBP, Location, Rotation);
+#endif triangle
 
 		}
-
 
 	}
 	retflag = false;
@@ -377,7 +482,7 @@ void MonteCarloCalculations(int Actors1)
 	UE_LOG(LogTemp, Warning, TEXT("MC"));
 
 	int X = 0, Y = 0;
-	int Actors = MaxNumber * MaxNumber; // to Edit
+	int Actors = MaxX * MaxY; // to Edit
 
 double OldEnergy = 0, NewEnergy = 0;
 	double W, probe;// w - the probabitity of temperature transition
@@ -396,8 +501,8 @@ double OldEnergy = 0, NewEnergy = 0;
 //		UE_LOG(LogTemp, Warning, TEXT("OldEnergy   %f,  NewEnergy   %f"), OldEnergy, NewEnergy);
 		if ((NewEnergy - OldEnergy) <= 0)//>
 		{
-			ensure(X >= 1 && X <= MaxNumber);
-			ensure(Y >= 1 && Y <= MaxNumber);
+			ensure(X >= 1 && X <= MaxX);
+			ensure(Y >= 1 && Y <= MaxY);
 			S[X - 1][Y - 1] = NewSpin;
 
 			double Energy = EnergyCalcTotal();
@@ -427,9 +532,9 @@ double OldEnergy = 0, NewEnergy = 0;
 void  AMonteCarloATT2Pawn::EraseAllSpins()
 {
 	int X, Y;
-	for (X = 1; X < MaxNumber+1; X++)
+	for (X = 1; X < MaxX+1; X++)
 	{
-		for (Y = 1; Y < MaxNumber+1; Y++)
+		for (Y = 1; Y < MaxY+1; Y++)
 		{
 			S[X-1][Y-1].reset();
 		}
@@ -441,9 +546,9 @@ double EnergyCalcTotal()
 {
 	int X = 0, Y = 0;
 	double Energy = 0;
-	for (X = 1; X < MaxNumber + 1; X++)
+	for (X = 1; X < MaxX + 1; X++)
 	{
-		for (Y = 1; Y < MaxNumber + 1; Y++)
+		for (Y = 1; Y < MaxY + 1; Y++)
 		{
 
 			Energy += EnergyCalc(S[X-1][Y-1], X , Y );
@@ -457,9 +562,9 @@ void PrintSpins()
 
 	int X = 0, Y = 0;
 
-	for (X = 1; X< MaxNumber + 1; X++)
+	for (X = 1; X< MaxX + 1; X++)
 	{
-		for (Y = 1; Y < MaxNumber + 1; Y++)
+		for (Y = 1; Y < MaxY + 1; Y++)
 		{
 
 			UE_LOG(LogTemp, Warning, TEXT("Syncronization Z  %f,   X %f"), S[X - 1][Y - 1].Sz, S[X - 1][Y - 1].Sx);
@@ -473,18 +578,21 @@ double EnergyCalc(const spin &Spin, int X, int Y)
 {
 	double Energy = 0;
 
-	ensure(X >= 1 && X <= MaxNumber);
-	ensure(Y >= 1 && Y <= MaxNumber);
+	ensure(X >= 1 && X <= MaxX);
+	ensure(Y >= 1 && Y <= MaxY);
 
+#ifdef square
 
-	if (X< MaxNumber )
+ // square
+
+	if (X< MaxX )
 	{
 		Energy += J * Spin.Sz * S[X ][Y-1].Sz;
 		Energy += J * Spin.Sx * S[X ][Y-1].Sx;
 		Energy += J * Spin.Sy * S[X ][Y-1].Sy;
 
 	}
-	if (Y < MaxNumber)
+	if (Y < MaxY)
 	{
 		Energy += J * Spin.Sz * S[X-1][Y ].Sz;
 		Energy += J * Spin.Sx * S[X-1][Y ].Sx;
@@ -505,8 +613,161 @@ double EnergyCalc(const spin &Spin, int X, int Y)
 
 
 	Energy += -h * Spin.Sz - Ansotropy* Spin.Sz * Spin.Sz;
+#endif square
+ 
+#ifdef triangle
 
+	enum SpinPosition
+	{
 
+		FirstTriangleLeft,
+		FirstTriangleRight,
+		FirstTriangleUp,
+		SecondTriangleLeft,
+		SecondTriangleRight,
+		SecondTriangleDown,
+	};
+	SpinPosition Position;
+
+	if (Y % 2 == 1)
+	{
+		switch ((X-1) % 6)
+		{ 
+		case 0:
+		{
+			Position = FirstTriangleLeft;
+		}break;
+		case 1:
+		{
+			Position = FirstTriangleRight;
+		}break;
+		case 2:
+		{
+			Position = FirstTriangleUp;
+		}break;
+		case 3:
+		{
+			Position = SecondTriangleLeft;
+		}break;
+		case 4:
+		{
+			Position = SecondTriangleRight;
+		}break;
+		case 5:
+		{
+			Position = SecondTriangleDown;
+		}break;
+		}
+	}
+	if (Y % 2 == 0)
+	{
+		switch ((X - 1) % 6)
+		{
+		case 0:
+		{
+			Position = SecondTriangleLeft;
+		}break;
+		case 1:
+		{
+			Position = SecondTriangleRight;
+		}break;
+		case 2:
+		{
+			Position = SecondTriangleDown ;
+		}break;
+		case 3:
+		{
+			Position = FirstTriangleLeft;
+		}break;
+		case 4:
+		{
+			Position = FirstTriangleRight;
+		}break;
+		case 5:
+		{
+			Position = FirstTriangleUp;
+		}break;
+		}
+	}
+
+	if (X < MaxX)
+	{
+		Energy += J * Spin.Sz * S[X][Y - 1].Sz;
+		Energy += J * Spin.Sx * S[X][Y - 1].Sx;
+		Energy += J * Spin.Sy * S[X][Y - 1].Sy;
+
+	}
+
+	if (X > 1)
+	{
+		Energy += J * Spin.Sz * S[X - 2][Y - 1].Sz;
+		Energy += J * Spin.Sx * S[X - 2][Y - 1].Sx;
+		Energy += J * Spin.Sy * S[X - 2][Y - 1].Sy;
+	}
+
+	switch (Position)
+	{
+		case (FirstTriangleUp):
+		{
+			if ((Y < MaxY))
+			{
+				Energy += Jrow * Spin.Sz * S[X - 1][Y].Sz;
+				Energy += Jrow * Spin.Sx * S[X - 1][Y].Sx;
+				Energy += Jrow * Spin.Sy * S[X - 1][Y].Sy;
+			}
+		};
+		case (SecondTriangleDown):
+		{
+			if (Y > 1)
+	        {
+		
+				Energy += Jrow * Spin.Sz * S[X - 1][Y-2].Sz;
+				Energy += Jrow * Spin.Sx * S[X - 1][Y-2].Sx;
+				Energy += Jrow * Spin.Sy * S[X - 1][Y-2].Sy;
+	        }
+		}
+		case FirstTriangleLeft:
+		{
+			if ((X < MaxX - 1))
+			{
+				Energy += J * Spin.Sz * S[X + 1][Y - 1].Sz;
+				Energy += J * Spin.Sx * S[X + 1][Y - 1].Sx;
+				Energy += J * Spin.Sy * S[X + 1][Y - 1].Sy;
+			}
+		}
+		case FirstTriangleRight:
+		{
+			if ((X < 2))
+			{
+				Energy += J * Spin.Sz * S[X - 3][Y - 1].Sz;
+				Energy += J * Spin.Sx * S[X - 3][Y - 1].Sx;
+				Energy += J * Spin.Sy * S[X - 3][Y - 1].Sy;
+			}
+		}
+		case SecondTriangleLeft:
+		{
+			if ((X < MaxX - 1))
+			{
+				Energy += J * Spin.Sz * S[X + 1][Y - 1].Sz;
+				Energy += J * Spin.Sx * S[X + 1][Y - 1].Sx;
+				Energy += J * Spin.Sy * S[X + 1][Y - 1].Sy;
+			}
+		}
+		case SecondTriangleRight:
+		{
+			if ((X < 2))
+			{
+				Energy += J * Spin.Sz * S[X - 3][Y - 1].Sz;
+				Energy += J * Spin.Sx * S[X - 3][Y - 1].Sx;
+				Energy += J * Spin.Sy * S[X - 3][Y - 1].Sy;
+			}
+		}
+	}
+	
+	
+
+	Energy += -h * Spin.Sz - Ansotropy * Spin.Sz * Spin.Sz;
+#endif triangle
 	return Energy;
 
 }
@@ -537,15 +798,15 @@ int AMonteCarloATT2Pawn::ConvertRowToNumber(int Column, int Row)
 
 	int rez;
 
-	rez = ((Row-1) * MaxNumber) + (Column-1);
+	rez = ((Row-1) * MaxX) + (Column-1); /// is result correct??
 	return rez;
 }
 void CalculateRawAndColumn(int Number, int &Column, int &Row)
 {
 
 	//  column = 1 ... MaxNumb, Row column = 1  
-	Row = Number / MaxNumber+1;
-	Column = Number % MaxNumber+1;
+	Row = Number / MaxX+1;
+	Column = Number % MaxX+1;
 	
 }
 

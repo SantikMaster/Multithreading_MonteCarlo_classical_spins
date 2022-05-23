@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
-#define MaxNumber 10
+#define MaxNumber 100
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
@@ -83,7 +83,7 @@ public:
 		void MonteCarlo();
 
 	UFUNCTION(BlueprintCallable)
-		void SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, int Raws_, int RawsPerL_);
+		void SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, float Jrow_, int Raws_, int RawsPerL_, int MaxX_, int MaxY_);
 
 protected:
 
