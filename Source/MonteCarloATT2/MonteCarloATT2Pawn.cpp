@@ -17,6 +17,7 @@
 #include "Async/Async.h"
 #include "Async/AsyncWork.h"
 #include <stdio.h>
+#include <numeric>
 #include "Spin_Num.h"
 
 #define _USE_MATH_DEFINES 
@@ -29,6 +30,9 @@ spin S[MaxNumber][MaxNumber];
 //vector<vector<spin>> S;
 
 int MaxX = 10, MaxY = 10;
+int Raws_Begin = 5;
+vector<float> Magnatization;
+vector<float> MagnatizationSquare;
 
 double J = -0.5, Jrow = -0.5;
 float h = -1, Ansotropy = -1.75; // to Edit
@@ -36,6 +40,7 @@ double hstart = 0, hend= -1.75, hdelta = 0.1;
 int Raws = 10,  RawsPerL = 1;
 double T = 0.0001;        // to Edit
 bool Processing = false;
+bool Ising = false;
 spin  NewSpin;
 void TextOut(std::string tText, int Number);
 AMonteCarloATT2Pawn::AMonteCarloATT2Pawn()
@@ -107,7 +112,7 @@ void AMonteCarloATT2Pawn::Tick(float DeltaSeconds)
 			&&	(!Processing) 
 			)
 		{
-			SynchronizeSpins();
+			this->SynchronizeSpins();
 	//		auto A = std::async(std::launch::async, [&]()
 	//		AsyncTask(ENamedThreads::BackgroundThreadPriority
 			Async(EAsyncExecution::Thread, [&]()
@@ -120,15 +125,34 @@ void AMonteCarloATT2Pawn::Tick(float DeltaSeconds)
     //      MyTask->EnsureCompletion();
 			MonteCarloCalculations(100);// Work!!
 			CurrenRaw++;
+			ensure(Raws > Raws_Begin);
+			if ( (CurrenRaw > Raws_Begin))
+			{
+				Magnatization.push_back(GetMagnetization());
+				MagnatizationSquare.push_back(GetMagnetizationSquare());
+			}
+		
 			if (CurrenRaw >= Raws + 1)
 			{
 
 				FString result;
-				double M;
-				M = GetMagnetization();
+				double M, Msq;
+				M = std::accumulate(Magnatization.begin(), Magnatization.end(), 0);
+				Msq = std::accumulate(MagnatizationSquare.begin(), MagnatizationSquare.end(), 0);
+				if (Magnatization.size()!=0)
+				{
+					M /= Magnatization.size();
+					Msq /= Magnatization.size();
+				}
+				Magnatization.clear();
+				MagnatizationSquare.clear();
+
+				double Susceptability = 1 / T * (Msq - M * M);
+
 				result = FString::SanitizeFloat(h);
-				result = result + "      ";
-				result = result + FString::SanitizeFloat(M);
+				result +=  "      ";
+				result += FString::SanitizeFloat(M);
+				result += "      " + FString::SanitizeFloat(Susceptability);
 				result = result + "    \n";
 
 				FString file = FPaths::ProjectConfigDir();
@@ -178,6 +202,20 @@ double AMonteCarloATT2Pawn::GetMagnetization()
 	}
 	return M;
 }
+double AMonteCarloATT2Pawn::GetMagnetizationSquare()
+{
+	double Msq = 0;
+	for (int i = 0; i < MaxX; i++)
+	{
+		for (int j = 0; j < MaxY; j++)
+		{
+			Msq += S[i][j].Sz*S[i][j].Sz;
+		}
+
+
+	}
+	return Msq;
+}
 
 
 void FMyAsyncTask::DoWork()
@@ -193,7 +231,7 @@ void FMyAsyncTask::DoWork()
 
 
 UFUNCTION(BlueprintCallable)
-void AMonteCarloATT2Pawn::SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, float Jrow_, int Raws_, int RawsPerL_, int MaxX_, int MaxY_)
+void AMonteCarloATT2Pawn::SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, float Jrow_, int Raws_, int RawsPerL_, int MaxX_, int MaxY_, bool Ising_)
 {
 	
 //	double h = 1, Ansotropy = -1.75; // to Edit
@@ -209,6 +247,8 @@ void AMonteCarloATT2Pawn::SetParameters(float hstart_, float hend_, float hdelta
 
 	MaxX = MaxX_;
 	MaxY = MaxY_;
+
+	Ising = Ising_;
 
 	h = hstart;
 
@@ -325,11 +365,19 @@ void AMonteCarloATT2Pawn::SetStartingSpinRotations(bool& retflag)
 		for (int j = 0; j < MaxY; j++)
 		{
 			Fi = (float)(std::rand() % 360);
-			cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
+				cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
 
-			Teta = 180 / M_PI * acos(cosTeta); //radians to grad
+				Teta = 180 / M_PI * acos(cosTeta); //radians to grad
+				if (Ising == true)
+				{
+				    Teta = 180 * (std::rand() % 2);
+				//	Teta = 180;
+				}
 
 			Rotation = SetSpinRotation(Teta, Fi);
+	//			UE_LOG(LogTemp, Warning, TEXT("Start!  Pith  %f,  Roll %f , Yaw %f"), Rotation.Pitch, Rotation.Roll, Rotation.Yaw);
+
+
 #ifdef square
 			Location = FVector(StartX + i * Distance_between, StartY + j * Distance_between, StartZ);
 			GetWorld()->SpawnActor<AActor>(SpinsBP, Location, Rotation);
@@ -440,21 +488,26 @@ void AMonteCarloATT2Pawn::SetStartingSpinRotations(bool& retflag)
 }
 void SetSpinRandomRotation(FRotator &Rotation)
 {
-
 	double Fi = (float)(std::rand() % 360);
-    double cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
-
+	double cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
 	double Teta = 180 / M_PI * acos(cosTeta); //radians to grad
+	if (Ising == true)
+	{
+    	Teta = M_PI * (std::rand() % 2);
+	}
 
-//	UE_LOG(LogTemp, Warning, TEXT("Fi  %f,  Teta %f"), Fi, Teta);
+	//*Rotation = FRotator(Teta, Fi, 0.f);
+//	Rotation = FRotator(0.f, 180.f, 180.f);
+	Rotation = FRotator(0.f, Teta, Fi);
 
-	Rotation = FRotator(Teta, Fi, 0.f);
+	// 
 //	UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f , Yaw %f"), Rotation.Pitch, Rotation.Roll, Rotation.Yaw);
 
 }
 FRotator AMonteCarloATT2Pawn::SetSpinRotation(float Teta, float Fi)
 {
-	FRotator Rotation(Teta, -Fi, 0.f);
+//*	FRotator Rotation(Teta, -Fi, 0.f);
+	FRotator Rotation(0.f, Teta, Fi);
 
 	return Rotation;
 }
@@ -478,7 +531,7 @@ void MonteCarloCalculations(int Actors1)
 	// S1 on S 
 	GEngine->AddOnScreenDebugMessage(1, 1.f,FColor::Black,"Start");
 	int SpinNumber;
-	int Steps = 1000000;
+	int Steps = 1000000;//*
 	UE_LOG(LogTemp, Warning, TEXT("MC"));
 
 	int X = 0, Y = 0;
@@ -493,7 +546,7 @@ double OldEnergy = 0, NewEnergy = 0;
 	{
 		SpinNumber = std::rand() % Actors;
 		CalculateRawAndColumn(SpinNumber, X, Y);
-	
+	//	UE_LOG(LogTemp, Warning, TEXT("Sz:   %f"), S[X - 1][Y - 1].Sz);
 		NewSpin.reset();
 		OldEnergy = EnergyCalc(S[X - 1][Y - 1], X, Y);
 		NewEnergy = EnergyCalc(NewSpin, X, Y);
@@ -567,7 +620,7 @@ void PrintSpins()
 		for (Y = 1; Y < MaxY + 1; Y++)
 		{
 
-			UE_LOG(LogTemp, Warning, TEXT("Syncronization Z  %f,   X %f"), S[X - 1][Y - 1].Sz, S[X - 1][Y - 1].Sx);
+		//	UE_LOG(LogTemp, Warning, TEXT("Syncronization Z  %f,   X %f"), S[X - 1][Y - 1].Sz, S[X - 1][Y - 1].Sx);
 
 		}
 	}
@@ -783,13 +836,13 @@ void AMonteCarloATT2Pawn::SynchronizeSpins()
 	{
 		CalculateRawAndColumn(jj, X, Y);
 
-
-//		UE_LOG(LogTemp, Warning, TEXT("Syncronization Pitch %f, Syncronization Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
-//			S[X - 1][Y - 1].rotation().Pitch, S[X - 1][Y - 1].rotation().Roll,
+//		UE_LOG(LogTemp, Warning, TEXT("Syncronization Yaw %f, Syncronization Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
+//			S[X - 1][Y - 1].rotation().Yaw, S[X - 1][Y - 1].rotation().Roll,
 //			S[X - 1][Y - 1].Sz, S[X - 1][Y - 1].Sx, S[X - 1][Y - 1].Sy	);
 		FoundActors[jj]->SetActorRotation(S[X-1][Y-1].rotation());  // to Edit
 
 	}
+	UE_LOG(LogTemp, Warning, TEXT("Syncronizaton"));
 
 }
 
@@ -817,9 +870,13 @@ spin::spin()
 //	UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f"), Rot.Pitch, Rot.Roll);
 	SetSpinRandomRotation(Rot);
 
-	Sz = cos(Rot.Yaw);
-	Sx = sin(Rot.Yaw) * cos(Rot.Pitch);
-	Sy = sin(Rot.Yaw) * sin(Rot.Pitch);
+//*	Sz = cos(Rot.Yaw);
+//*	Sx = sin(Rot.Yaw) * cos(Rot.Pitch);
+//*	Sy = sin(Rot.Yaw) * sin(Rot.Pitch);
+	Sz = cos(Rot.Roll * M_PI / 180);
+	Sx = sin(Rot.Roll * M_PI / 180) * cos(Rot.Yaw * M_PI / 180);
+	Sy = sin(Rot.Roll * M_PI / 180) * sin(Rot.Yaw * M_PI / 180);
+
 
 //	UE_LOG(LogTemp, Warning, TEXT("Z  %f,  Y   %f,   X %f"), Sz, Sy, Sx);
 
@@ -831,9 +888,18 @@ void spin::reset()
 	//	UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f"), Rot.Pitch, Rot.Roll);
 	SetSpinRandomRotation(Rot);
 
-	Sz = cos(Rot.Yaw);
-	Sx = sin(Rot.Yaw) * cos(Rot.Pitch);
-	Sy = sin(Rot.Yaw) * sin(Rot.Pitch);
+
+//*	Sz = cos(Rot.Yaw);
+//*	Sx = sin(Rot.Yaw) * cos(Rot.Pitch);
+//*	Sy = sin(Rot.Yaw) * sin(Rot.Pitch);
+	Sz = cos(Rot.Roll * M_PI/180);
+	Sx = sin(Rot.Roll * M_PI / 180) * cos(Rot.Yaw * M_PI / 180);
+	Sy = sin(Rot.Roll * M_PI / 180) * sin(Rot.Yaw * M_PI / 180);
+
+//	UE_LOG(LogTemp, Warning, TEXT("rotat Yaw %f, rotat Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
+//		Rot.Yaw, Rot.Roll,
+//		Sz, Sx, Sy);
+
 
 }
 void AMonteCarloATT2Pawn::TextOut(FString Text, int Number)

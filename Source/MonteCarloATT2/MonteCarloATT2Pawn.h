@@ -66,7 +66,7 @@ class AMonteCarloATT2Pawn : public APawn
 	void TextOut(FString tText, int Number);
 
 	double GetMagnetization();
-
+	double GetMagnetizationSquare();
 
 public:
 
@@ -83,7 +83,7 @@ public:
 		void MonteCarlo();
 
 	UFUNCTION(BlueprintCallable)
-		void SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, float Jrow_, int Raws_, int RawsPerL_, int MaxX_, int MaxY_);
+		void SetParameters(float hstart_, float hend_, float hdelta_, float Anis_, float T_, float J_, float Jrow_, int Raws_, int RawsPerL_, int MaxX_, int MaxY_, bool Ising_);
 
 protected:
 
@@ -144,9 +144,15 @@ class spin
 public:
 	spin(FRotator Rot)
 	{
-		Sz = cos(Rot.Pitch);
-		Sx = sin(Rot.Pitch) * cos(Rot.Roll);
-		Sy = sin(Rot.Pitch) * sin(Rot.Roll);
+	//*	Sz = cos(Rot.Pitch);
+	//*	Sx = sin(Rot.Pitch) * cos(Rot.Roll);
+	//*	Sy = sin(Rot.Pitch) * sin(Rot.Roll);
+		Sz = cos(Rot.Roll * M_PI / 180);
+		Sx = sin(Rot.Roll * M_PI / 180) * cos(Rot.Yaw * M_PI / 180);
+		Sy = sin(Rot.Roll * M_PI / 180) * sin(Rot.Yaw * M_PI / 180);
+		UE_LOG(LogTemp, Warning, TEXT("Creation Yaw %f, Creation Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
+						Rot.Yaw, Rot.Roll,
+						Sz, Sx, Sy	);
 	}
 	spin();
 	void reset();
@@ -157,15 +163,21 @@ public:
 
 
 		FRotator Result(0., 0., 0.);
-		Result.Pitch = 180 - 360 / M_PI * acos(Sz); 
+		//*	Result.Pitch = 180 - 360 / M_PI * acos(Sz); 
+		Result.Yaw = 180 - 360 / M_PI * acos(Sz);
 		if (Sy != 0 )//&& Sz != 0 && Sz != 180
 		{
-			Result.Roll = 360 / M_PI * atan(Sx / Sy) ; /// to Edit  / asin(Sz)
+			//*	Result.Roll = 360 / M_PI * atan(Sx / Sy) ; /// to Edit  / asin(Sz)
+			Result.Roll = 360 / M_PI * atan(Sx / Sy); /// to Edit  / asin(Sz)
 		}
 		else
 		{
-			Result.Pitch = 0;
+			//*			Result.Pitch = 0;
+			Result.Yaw= 0;
 		}
+	//	UE_LOG(LogTemp, Warning, TEXT("rotat Yaw %f, rotat Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
+	//		Result.Yaw, Result.Roll,
+	//		Sz, Sx, Sy);
 		//			UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f"), Result.Pitch, Result.Roll);
 		//         	UE_LOG(LogTemp, Warning, TEXT("Z  %f,  Y   %f,   X %f"), Sz, Sy, Sx);
 
