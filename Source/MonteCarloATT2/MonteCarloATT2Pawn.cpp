@@ -137,16 +137,17 @@ void AMonteCarloATT2Pawn::Tick(float DeltaSeconds)
 
 				FString result;
 				double M, Msq;
-				M = std::accumulate(Magnatization.begin(), Magnatization.end(), 0);
-				Msq = std::accumulate(MagnatizationSquare.begin(), MagnatizationSquare.end(), 0);
+				M = std::accumulate(Magnatization.begin(), Magnatization.end(), 0.f);
+				Msq = std::accumulate(MagnatizationSquare.begin(), MagnatizationSquare.end(), 0.f);
+				
 				if (Magnatization.size()!=0)
 				{
-					M /= Magnatization.size();
-					Msq /= Magnatization.size();
+					M /= (double) Magnatization.size();
+					Msq /= (double) MagnatizationSquare.size();
 				}
 				Magnatization.clear();
 				MagnatizationSquare.clear();
-
+				UE_LOG(LogTemp, Warning, TEXT("M: %f, Msq: %f"), M, Msq);
 				double Susceptability = 1 / T * (Msq - M * M);
 
 				result = FString::SanitizeFloat(h);
@@ -157,6 +158,7 @@ void AMonteCarloATT2Pawn::Tick(float DeltaSeconds)
 
 				FString file = FPaths::ProjectConfigDir();
 				file.Append(TEXT("Data.txt"));
+				UE_LOG(LogTemp, Warning, TEXT("M: %f, Susp: %f"), M, Susceptability);
 
 				if (FFileHelper::SaveStringToFile(result, *file, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), EFileWrite::FILEWRITE_Append))
 				{
@@ -200,7 +202,11 @@ double AMonteCarloATT2Pawn::GetMagnetization()
 
 
 	}
-	return M;
+	double XY  =  MaxX * MaxY;
+//	UE_LOG(LogTemp, Warning, TEXT("M: %f, X%i , Y: %i, XY%f"), M, MaxX , MaxY, XY);
+	M /= XY;
+//	UE_LOG(LogTemp, Warning, TEXT("M: %f, -----f"), M);
+	return (M );
 }
 double AMonteCarloATT2Pawn::GetMagnetizationSquare()
 {
@@ -210,11 +216,17 @@ double AMonteCarloATT2Pawn::GetMagnetizationSquare()
 		for (int j = 0; j < MaxY; j++)
 		{
 			Msq += S[i][j].Sz*S[i][j].Sz;
+		
 		}
 
 
 	}
-	return Msq;
+	double XY = MaxX * MaxY;
+
+
+	Msq /= XY;
+//	UE_LOG(LogTemp, Warning, TEXT("Msq: %f, -----f"), Msq);
+	return (Msq );
 }
 
 
