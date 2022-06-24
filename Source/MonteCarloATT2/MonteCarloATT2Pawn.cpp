@@ -30,7 +30,7 @@ spin S[MaxNumber][MaxNumber];
 //vector<vector<spin>> S;
 
 int MaxX = 10, MaxY = 10;
-int Raws_Begin = 5;
+int Raws_Begin = 100;
 vector<float> Magnatization;
 vector<float> MagnatizationSquare;
 
@@ -40,7 +40,7 @@ double hstart = 0, hend= -1.75, hdelta = 0.1;
 int Raws = 10,  RawsPerL = 1;
 double T = 0.0001;        // to Edit
 bool Processing = false;
-bool Ising = false;
+bool Ising = true;
 spin  NewSpin;
 void TextOut(std::string tText, int Number);
 AMonteCarloATT2Pawn::AMonteCarloATT2Pawn()
@@ -113,16 +113,13 @@ void AMonteCarloATT2Pawn::Tick(float DeltaSeconds)
 			)
 		{
 			this->SynchronizeSpins();
-	//		auto A = std::async(std::launch::async, [&]()
-	//		AsyncTask(ENamedThreads::BackgroundThreadPriority
+
 			Async(EAsyncExecution::Thread, [&]()
 			{
 			Processing = true;
 			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT("Process started, raw %i,  h = %f"), CurrenRaw, h));
 
-	//		auto MyTask = new FAsyncTask<FMyAsyncTask>(0); // to Edit
-	//		MyTask->StartBackgroundTask();
-    //      MyTask->EnsureCompletion();
+
 			MonteCarloCalculations(100);// Work!!
 			CurrenRaw++;
 			ensure(Raws > Raws_Begin);
@@ -230,16 +227,7 @@ double AMonteCarloATT2Pawn::GetMagnetizationSquare()
 }
 
 
-void FMyAsyncTask::DoWork()
-{
-	
-	GEngine->AddOnScreenDebugMessage(-5, 5.f, FColor::Red, FString::Printf(TEXT("Async Begin")));
-	//
-	//FPlatformProcess::Sleep(3);
-     MonteCarloCalculations(Actors);
-	GEngine->AddOnScreenDebugMessage(-5,5.f, FColor::Red, FString::Printf(TEXT("Async Task Started Actors: %i"), Actors));
 
-}
 
 
 UFUNCTION(BlueprintCallable)
@@ -348,8 +336,6 @@ void AMonteCarloATT2Pawn::BeginPlay()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Input "));
 		InputComponent->BindAction("StartModelling", IE_Pressed, this, &AMonteCarloATT2Pawn::MonteCarlo);
-
-
 	}
 
 	
@@ -358,6 +344,113 @@ void AMonteCarloATT2Pawn::BeginPlay()
 
 
 }
+FVector AMonteCarloATT2Pawn::SetSpinLocation(int i, int j)
+{
+	FVector Location;
+#ifdef square
+	Location = FVector(StartX + i * Distance_between, StartY + j * Distance_between, StartZ);
+#endif square
+
+#ifdef triangle
+
+	enum SpinPosition
+	{
+
+		FirstTriangleLeft,
+		FirstTriangleRight,
+		FirstTriangleUp,
+		SecondTriangleLeft,
+		SecondTriangleRight,
+		SecondTriangleDown,
+	};
+	SpinPosition Position;
+	//	int X = (i + 1), Y = j + 1;
+
+	//	float Test = 10000;
+	if ((j % 2) == 1)
+	{
+		switch (i % 6)
+		{
+		case 0:
+		{
+			Position = FirstTriangleLeft;
+			Location = FVector(StartX + 0, StartY + 0, StartZ);
+		}break;
+		case 1:
+		{
+			Position = FirstTriangleRight;
+			Location = FVector(StartX + Distance_between, StartY + 0, StartZ);
+		}break;
+		case 2:
+		{
+			Position = FirstTriangleUp;
+			Location = FVector(StartX + Distance_between / 2, StartY + Distance_between * sqrt(2) / 2, StartZ);
+		}break;
+		case 3:
+		{
+			Position = SecondTriangleLeft;
+			Location = FVector(StartX + 2 * Distance_between, StartY + 0, StartZ);
+		}break;
+		case 4:
+		{
+			Position = SecondTriangleRight;
+			Location = FVector(StartX + 3 * Distance_between, StartY + 0, StartZ);
+		}break;
+		case 5:
+		{
+			Position = SecondTriangleDown;
+			Location = FVector(StartX + 2 * Distance_between + Distance_between / 2, StartY - Distance_between * sqrt(2) / 2, StartZ);
+		}break;
+		}
+	}
+	if ((j % 2) == 0)
+	{
+		switch (i % 6)
+		{
+		case 0:
+		{
+			Position = SecondTriangleLeft;
+			Location = FVector(StartX + 0, StartY + 3 * Distance_between + 0, StartZ);
+		}break;
+		case 1:
+		{
+			Position = SecondTriangleRight;
+			Location = FVector(StartX + Distance_between, StartY + 0 + 3 * Distance_between, StartZ);
+		}break;
+		case 2:
+		{
+			Position = SecondTriangleDown;
+			Location = FVector(StartX + Distance_between / 2, StartY + 3 * Distance_between - Distance_between * sqrt(2) / 2, StartZ);
+
+		}break;
+		case 3:
+		{
+			Position = FirstTriangleLeft;
+			Location = FVector(StartX + 2 * Distance_between, StartY + 3 * Distance_between + 0, StartZ);
+		}break;
+		case 4:
+		{
+			Position = FirstTriangleRight;
+			Location = FVector(StartX + 3 * Distance_between, StartY + 3 * Distance_between + 0, StartZ);
+		}break;
+		case 5:
+		{
+			Position = FirstTriangleUp;
+			Location = FVector(StartX + 2 * Distance_between + Distance_between / 2, StartY + 3 * Distance_between + Distance_between * sqrt(2) / 2, StartZ);
+
+		}break;
+		}
+	}
+	FVector SiteLocation = FVector((i / 6) * 4 * Distance_between, (j / 2) * 6 * Distance_between, 0);
+
+	Location += SiteLocation;
+
+	
+#endif triangle
+	return Location;
+}
+
+
 void AMonteCarloATT2Pawn::SetStartingSpinRotations(bool& retflag)
 {
 	retflag = true;
@@ -377,149 +470,33 @@ void AMonteCarloATT2Pawn::SetStartingSpinRotations(bool& retflag)
 		for (int j = 0; j < MaxY; j++)
 		{
 			Fi = (float)(std::rand() % 360);
-				cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
+			cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
 
-				Teta = 180 / M_PI * acos(cosTeta); //radians to grad
-				if (Ising == true)
-				{
-				    Teta = 180 * (std::rand() % 2);
+			Teta = 180 / M_PI * acos(cosTeta); //radians to grad
+			if (Ising == true)
+			{
+				Teta = 180 * (std::rand() % 2);
 				//	Teta = 180;
-				}
+			}
 
 			Rotation = SetSpinRotation(Teta, Fi);
-	//			UE_LOG(LogTemp, Warning, TEXT("Start!  Pith  %f,  Roll %f , Yaw %f"), Rotation.Pitch, Rotation.Roll, Rotation.Yaw);
+	//		UE_LOG(LogTemp, Warning, TEXT("Start!  Pith  %f,  Roll %f , Yaw %f"), Rotation.Pitch, Rotation.Roll, Rotation.Yaw);
 
-
-#ifdef square
-			Location = FVector(StartX + i * Distance_between, StartY + j * Distance_between, StartZ);
+			Location = SetSpinLocation(i, j);
 			GetWorld()->SpawnActor<AActor>(SpinsBP, Location, Rotation);
-#endif square
 
-#ifdef triangle
-
-			enum SpinPosition
-			{
-
-				FirstTriangleLeft,
-				FirstTriangleRight,
-				FirstTriangleUp,
-				SecondTriangleLeft,
-				SecondTriangleRight,
-				SecondTriangleDown,
-			};
-			SpinPosition Position;
-		//	int X = (i + 1), Y = j + 1;
-
-		//	float Test = 10000;
-			if ((j % 2) == 1)
-			{
-				switch (i % 6)
-				{
-				case 0:
-				{
-					Position = FirstTriangleLeft;
-					Location = FVector(StartX + 0, StartY + 0, StartZ);
-				}break;
-				case 1:
-				{
-					Position = FirstTriangleRight;
-					Location = FVector(StartX + Distance_between, StartY + 0, StartZ);
-				}break;
-				case 2:
-				{
-					Position = FirstTriangleUp;
-					Location = FVector(StartX + Distance_between / 2, StartY + Distance_between * sqrt(2) / 2, StartZ);
-				}break;
-				case 3:
-				{
-					Position = SecondTriangleLeft;
-					Location = FVector(StartX + 2 * Distance_between, StartY + 0, StartZ);
-				}break;
-				case 4:
-				{
-					Position = SecondTriangleRight;
-					Location = FVector(StartX + 3 * Distance_between, StartY + 0, StartZ);
-				}break;
-				case 5:
-				{
-					Position = SecondTriangleDown;
-					Location = FVector(StartX + 2 * Distance_between + Distance_between / 2, StartY - Distance_between * sqrt(2) / 2, StartZ);
-				}break;
-				}
-			}
-			if ((j % 2) == 0)
-			{
-				switch (i % 6)
-				{
-				case 0:
-				{
-					Position = SecondTriangleLeft;
-					Location = FVector(StartX + 0, StartY+ 3 * Distance_between + 0, StartZ );
-				}break;
-				case 1:
-				{
-					Position = SecondTriangleRight;
-					Location = FVector(StartX + Distance_between , StartY + 0+ 3 * Distance_between, StartZ);
-				}break;
-				case 2:
-				{
-					Position = SecondTriangleDown;
-					Location = FVector(StartX + Distance_between / 2, StartY+ 3 * Distance_between - Distance_between * sqrt(2) / 2, StartZ );
-
-				}break;
-				case 3:
-				{
-					Position = FirstTriangleLeft;
-					Location = FVector(StartX + 2 * Distance_between, StartY + 3 * Distance_between + 0, StartZ);
-				}break;
-				case 4:
-				{
-					Position = FirstTriangleRight;
-					Location = FVector(StartX + 3 * Distance_between, StartY + 3 * Distance_between + 0, StartZ);
-				}break;
-				case 5:
-				{
-					Position = FirstTriangleUp;
-					Location = FVector(StartX + 2 * Distance_between + Distance_between / 2, StartY  + 3 * Distance_between+ Distance_between * sqrt(2) / 2, StartZ);
-
-				}break;
-				}
-			}
-			FVector SiteLocation = FVector((i / 6) * 4 * Distance_between, (j / 2) * 6 * Distance_between, 0);
-
-			Location += SiteLocation;
-
-			//		Location = FVector(StartX + i * Distance_between, StartY + j * Distance_between*3 , StartZ);
-			GetWorld()->SpawnActor<AActor>(SpinsBP, Location, Rotation);
-#endif triangle
 
 		}
 
 	}
 	retflag = false;
 }
-void SetSpinRandomRotation(FRotator &Rotation)
-{
-	double Fi = (float)(std::rand() % 360);
-	double cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
-	double Teta = 180 / M_PI * acos(cosTeta); //radians to grad
-	if (Ising == true)
-	{
-    	Teta = M_PI * (std::rand() % 2);
-	}
 
-	//*Rotation = FRotator(Teta, Fi, 0.f);
-//	Rotation = FRotator(0.f, 180.f, 180.f);
-	Rotation = FRotator(0.f, Teta, Fi);
-
-	// 
-//	UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f , Yaw %f"), Rotation.Pitch, Rotation.Roll, Rotation.Yaw);
-
-}
 FRotator AMonteCarloATT2Pawn::SetSpinRotation(float Teta, float Fi)
 {
-//*	FRotator Rotation(Teta, -Fi, 0.f);
-	FRotator Rotation(0.f, Teta, Fi);
+	FRotator Rotation = FRotator(0.f, Teta, Fi);
+
+	//FRotator Rotation = FRotator(0.f, 0.f, 0.f);
 
 	return Rotation;
 }
@@ -543,13 +520,13 @@ void MonteCarloCalculations(int Actors1)
 	// S1 on S 
 	GEngine->AddOnScreenDebugMessage(1, 1.f,FColor::Black,"Start");
 	int SpinNumber;
-	int Steps = 1000000;//*
+	int Steps = 10000;//*
 	UE_LOG(LogTemp, Warning, TEXT("MC"));
 
 	int X = 0, Y = 0;
 	int Actors = MaxX * MaxY; // to Edit
 
-double OldEnergy = 0, NewEnergy = 0;
+	double OldEnergy = 0, NewEnergy = 0;
 	double W, probe;// w - the probabitity of temperature transition
 
 
@@ -558,7 +535,7 @@ double OldEnergy = 0, NewEnergy = 0;
 	{
 		SpinNumber = std::rand() % Actors;
 		CalculateRawAndColumn(SpinNumber, X, Y);
-	//	UE_LOG(LogTemp, Warning, TEXT("Sz:   %f"), S[X - 1][Y - 1].Sz);
+	
 		NewSpin.reset();
 		OldEnergy = EnergyCalc(S[X - 1][Y - 1], X, Y);
 		NewEnergy = EnergyCalc(NewSpin, X, Y);
@@ -632,7 +609,7 @@ void PrintSpins()
 		for (Y = 1; Y < MaxY + 1; Y++)
 		{
 
-		//	UE_LOG(LogTemp, Warning, TEXT("Syncronization Z  %f,   X %f"), S[X - 1][Y - 1].Sz, S[X - 1][Y - 1].Sx);
+			UE_LOG(LogTemp, Warning, TEXT("Syncronization Z  X:%i, Y %i %f,   X %f"), X, Y, S[X - 1][Y - 1].Sz, S[X - 1][Y - 1].Sx);
 
 		}
 	}
@@ -650,7 +627,7 @@ double EnergyCalc(const spin &Spin, int X, int Y)
 
  // square
 
-	if (X< MaxX )
+	if (X < MaxX)
 	{
 		Energy += J * Spin.Sz * S[X ][Y-1].Sz;
 		Energy += J * Spin.Sx * S[X ][Y-1].Sx;
@@ -677,7 +654,11 @@ double EnergyCalc(const spin &Spin, int X, int Y)
 	}
 
 
-	Energy += -h * Spin.Sz - Ansotropy* Spin.Sz * Spin.Sz;
+	
+//	UE_LOG(LogTemp, Warning, TEXT("Sz Sx Sy   %f, %f %f "), Spin.Sz, Spin.Sx, Spin.Sy);
+//	UE_LOG(LogTemp, Warning, TEXT("Energy   %f,   "), Energy);
+	Energy += -h * Spin.Sz - Ansotropy * Spin.Sz * Spin.Sz;
+
 #endif square
  
 #ifdef triangle
@@ -848,14 +829,13 @@ void AMonteCarloATT2Pawn::SynchronizeSpins()
 	{
 		CalculateRawAndColumn(jj, X, Y);
 
-//		UE_LOG(LogTemp, Warning, TEXT("Syncronization Yaw %f, Syncronization Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
-//			S[X - 1][Y - 1].rotation().Yaw, S[X - 1][Y - 1].rotation().Roll,
-//			S[X - 1][Y - 1].Sz, S[X - 1][Y - 1].Sx, S[X - 1][Y - 1].Sy	);
-		FoundActors[jj]->SetActorRotation(S[X-1][Y-1].rotation());  // to Edit
 
+		FoundActors[jj]->SetActorRotation(S[X-1][Y-1].rotation());  // to Edit
+		FoundActors[jj]->SetActorLocation(SetSpinLocation(X-1, Y-1));
+	//	UE_LOG(LogTemp, Warning, TEXT("Actor N %i X%i Y%i %f "), jj, X, Y, S[X - 1][Y - 1].Sz);
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Syncronizaton"));
-
+	PrintSpins();
 }
 
 int AMonteCarloATT2Pawn::ConvertRowToNumber(int Column, int Row)
@@ -877,24 +857,53 @@ void CalculateRawAndColumn(int Number, int &Column, int &Row)
 
 spin::spin()
 {
+	float Fi, cosTeta, Teta;
+	Fi = (float)(std::rand() % 360);
+	cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
+
+	Teta = 180 / M_PI * acos(cosTeta); //radians to grad
+	if (Ising == true)
+	{
+		Teta = 180 * (std::rand() % 2);
+	}
+
+	Sz = cos(Teta * M_PI / 180);
+	Sx = sin(Teta * M_PI / 180) * cos(Fi * M_PI / 180);
+	Sy = sin(Teta * M_PI / 180) * sin(Fi * M_PI / 180);
+	/*
 	FRotator Rot(0.f, 0.f , 0.f);
 //	UE_LOG(LogTemp, Warning, TEXT("Pith  %i,  Roll %i"), Rot.Pitch, Rot.Roll);
 //	UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f"), Rot.Pitch, Rot.Roll);
 	SetSpinRandomRotation(Rot);
 
-//*	Sz = cos(Rot.Yaw);
-//*	Sx = sin(Rot.Yaw) * cos(Rot.Pitch);
-//*	Sy = sin(Rot.Yaw) * sin(Rot.Pitch);
+	UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f, Yaw %f"), Rot.Pitch, Rot.Roll, Rot.Yaw);
+
 	Sz = cos(Rot.Roll * M_PI / 180);
 	Sx = sin(Rot.Roll * M_PI / 180) * cos(Rot.Yaw * M_PI / 180);
 	Sy = sin(Rot.Roll * M_PI / 180) * sin(Rot.Yaw * M_PI / 180);
-
+*/
+//	UE_LOG
 
 //	UE_LOG(LogTemp, Warning, TEXT("Z  %f,  Y   %f,   X %f"), Sz, Sy, Sx);
 
 }
 void spin::reset()
 {
+	float Fi, cosTeta, Teta;
+	Fi = (float)(std::rand() % 360);
+	cosTeta = (float)(std::rand() % 2000 - 1000) * 0.001;
+
+	Teta = 180 / M_PI * acos(cosTeta); //radians to grad
+	if (Ising == true)
+	{
+		Teta = 180 * (std::rand() % 2);
+	}
+	Sz = cos(Teta * M_PI / 180);
+	Sx = sin(Teta * M_PI / 180) * cos(Fi * M_PI / 180);
+	Sy = sin(Teta * M_PI / 180) * sin(Fi * M_PI / 180);
+	/*
+
+
 	FRotator Rot(0.f, 0.f, 0.f);
 	//	UE_LOG(LogTemp, Warning, TEXT("Pith  %i,  Roll %i"), Rot.Pitch, Rot.Roll);
 	//	UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f"), Rot.Pitch, Rot.Roll);
@@ -911,7 +920,7 @@ void spin::reset()
 //	UE_LOG(LogTemp, Warning, TEXT("rotat Yaw %f, rotat Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
 //		Rot.Yaw, Rot.Roll,
 //		Sz, Sx, Sy);
-
+	*/
 
 }
 void AMonteCarloATT2Pawn::TextOut(FString Text, int Number)
@@ -940,95 +949,5 @@ void AMonteCarloATT2Pawn::TextOut(FString Text, int Number)
 	return;
 }
 
-/*
-void MonteCarlo()
-{
-	int i, j;
-	double OldEnergy, NewEnergy;
-	long double W;
-	i = rand() % SIZE;
-	j = rand() % SIZE;
-	OldEnergy = EnergyCalc(i, j);
-	S[i][j].Sz = -1 * S[i][j].Sz;
-	NewEnergy = EnergyCalc(i, j);
-	if (OldEnergy < NewEnergy)
-	{
-		S[i][j].Sz = -1 * S[i][j].Sz;
 
-		W = exp(-(NewEnergy - OldEnergy) / T);
-
-		if ((rand() % 1001) / 1000 < W)
-		{
-			S[i][j].Sz = -1 * S[i][j].Sz;
-		}
-	}
-
-
-
-}
-double EnergyCalc(int i, int j)
-{
-double Energy = 0, dist;
-
-	if (i!= SIZE)
-	{
-		Energy+= J[i][j][0]*S[i][j].Sz*S[i+1][j].Sz;
-	}
-	if (j!= SIZE)
-	{
-		Energy+= J[i][j][1]*S[i][j].Sz*S[i][j+1].Sz;
-	}
-	if (i!= 0)
-	{
-		Energy+= J[i-1][j][0]*S[i][j].Sz*S[i-1][j].Sz;
-	}
-	if (j!= 0)
-	{
-		Energy+= J[i][j-1][1]*S[i][j].Sz*S[i][j-1].Sz;
-	}
-
-		int ii, jj;
-	for (ii = 0; ii<SIZE; ii++)
-	{
-		for (jj = 0; jj<SIZE; jj++)
-		{
-			dist = distance (S[i][j], S[ii][jj]);
-			if (dist!=0) Energy += J_d/dist/dist*S[i][j].Sz*S[ii][jj].Sz;
-		}
-   }
-Energy -= h*S[i][j].Sz;
-
-return Energy;
-
-}
-void TextOut(string Text, int Number)
-{
-
-	// #include <stdio.h>
-
-	FILE	 	*stream;
-	char str[10];
-
-
-	char Stri[25];
-
-
-	stream =
-		fopen("DataEnh.txt",  "a");
-fopen(Stri,  "a");
-
-
-	//  "Data.txt"
-	char * p;
-	p = (char *)Text.c_str();
-	if (stream != NULL)
-	{
-		fprintf(stream, p, "DataEnh.txt");
-
-		fclose(stream);
-	}
-	return;
-}
-
-*/
 

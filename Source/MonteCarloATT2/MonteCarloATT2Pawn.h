@@ -37,14 +37,9 @@ class AMonteCarloATT2Pawn : public APawn
 
 	void SetStartingSpinRotations(bool& retflag);
 	
-	
-
+	FRotator SetSpinRotation(float Teta, float Fi);
 
 	bool MC_Modeling = false;
-
-//	double J = 0.5;
-//	double h = 2, Ansotropy = 0.75;
-//	double T = 0.00001; /// Temperature;
 
 	float StartX = -5000.;
 	float StartY = -5000.;
@@ -53,10 +48,6 @@ class AMonteCarloATT2Pawn : public APawn
 	int CurrenRaw = 0;
 
 	float Distance_between = 1000.;
-
-	 FRotator SetSpinRotation(float Teta, float Fi);
-
-
 
 
 	int ConvertRowToNumber(int Column,  int Row);
@@ -67,6 +58,8 @@ class AMonteCarloATT2Pawn : public APawn
 
 	double GetMagnetization();
 	double GetMagnetizationSquare();
+
+	FVector SetSpinLocation(int i, int j);
 
 public:
 
@@ -142,18 +135,7 @@ public:
 class spin
 {
 public:
-	spin(FRotator Rot)
-	{
-	//*	Sz = cos(Rot.Pitch);
-	//*	Sx = sin(Rot.Pitch) * cos(Rot.Roll);
-	//*	Sy = sin(Rot.Pitch) * sin(Rot.Roll);
-		Sz = cos(Rot.Roll * M_PI / 180);
-		Sx = sin(Rot.Roll * M_PI / 180) * cos(Rot.Yaw * M_PI / 180);
-		Sy = sin(Rot.Roll * M_PI / 180) * sin(Rot.Yaw * M_PI / 180);
-		UE_LOG(LogTemp, Warning, TEXT("Creation Yaw %f, Creation Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
-						Rot.Yaw, Rot.Roll,
-						Sz, Sx, Sy	);
-	}
+
 	spin();
 	void reset();
 
@@ -163,23 +145,20 @@ public:
 
 
 		FRotator Result(0., 0., 0.);
-		//*	Result.Pitch = 180 - 360 / M_PI * acos(Sz); 
-		Result.Yaw = 180 - 360 / M_PI * acos(Sz);
-		if (Sy != 0 )//&& Sz != 0 && Sz != 180
+
+
+		Result.Roll = 0 + 180 / M_PI * acos(Sz);
+		if (Sy != 0 )
 		{
-			//*	Result.Roll = 360 / M_PI * atan(Sx / Sy) ; /// to Edit  / asin(Sz)
-			Result.Roll = 360 / M_PI * atan(Sx / Sy); /// to Edit  / asin(Sz)
+			Result.Yaw = 360 / M_PI * atan(Sx / Sy);
+		//	Result.Yaw = 0;
 		}
 		else
 		{
-			//*			Result.Pitch = 0;
+
 			Result.Yaw= 0;
 		}
-	//	UE_LOG(LogTemp, Warning, TEXT("rotat Yaw %f, rotat Roll %f,  SZ  %f  , Sx %f, Sy   %f"),
-	//		Result.Yaw, Result.Roll,
-	//		Sz, Sx, Sy);
-		//			UE_LOG(LogTemp, Warning, TEXT("Pith  %f,  Roll %f"), Result.Pitch, Result.Roll);
-		//         	UE_LOG(LogTemp, Warning, TEXT("Z  %f,  Y   %f,   X %f"), Sz, Sy, Sx);
+
 
 		return Result;
 	}
@@ -190,28 +169,10 @@ public:
 
 void CalculateRawAndColumn(int Number, int& Column, int& Row);
 
-class FMyAsyncTask : public FNonAbandonableTask
-{	
-public:
-	FMyAsyncTask(int32 InLoopCount) { Actors = InLoopCount;
-	};
-	FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FMyAsyncTask, STATGROUP_ThreadPoolAsyncTasks); }
-	void DoWork();
 
-
-private:
-	int Actors;
-
-
-
-
-
-};
 double EnergyCalc(const spin& Spin, int X, int Y);
-static void SetSpinRandomRotation(FRotator& Rotation);
+//static void SetSpinRandomRotation(FRotator& Rotation);
 void MonteCarloCalculations(int SpinNumber);
 double EnergyCalcTotal();
 
 void PrintSpins();
-
-//
